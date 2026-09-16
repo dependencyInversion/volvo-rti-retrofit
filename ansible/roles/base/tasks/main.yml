@@ -1,0 +1,20 @@
+---
+- name: Update apt cache and upgrade all packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+  become: true
+
+- name: Install fish shell and bpytop
+  ansible.builtin.apt:
+    name:
+      - fish
+      - bpytop
+    state: present
+  become: true
+
+- name: Set fish as the default shell for the connecting user
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    shell: /usr/bin/fish
+  become: true

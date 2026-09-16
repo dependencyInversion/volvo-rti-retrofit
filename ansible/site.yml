@@ -1,0 +1,19 @@
+---
+- name: Provision Raspberry Pi infotainment device
+  hosts: raspberrypi
+  gather_facts: true
+
+  roles:
+    - role: base
+
+    - role: livi
+      when: target_app == "livi"
+
+    - role: hudiy
+      when: target_app == "hudiy"
+
+  post_tasks:
+    - name: Reboot after install
+      ansible.builtin.reboot:
+      become: true
+      when: reboot_after_install | default(true) | bool

@@ -1,0 +1,91 @@
+---
+- name: Get default systemd boot target
+  ansible.builtin.command: systemctl get-default
+  register: hudiy_boot_target
+  changed_when: false
+
+- name: Verify OS matches Hudiy's requirements (Debian 64-bit Bookworm with Desktop)
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == "Debian"
+      - ansible_facts['distribution_release'] == "bookworm"
+      - ansible_facts['architecture'] == "aarch64"
+      - hudiy_boot_target.stdout == "graphical.target"
+    fail_msg: >-
+      Hudiy requires Raspberry Pi OS (64-bit, Debian 12 "bookworm") WITH DESKTOP.
+      Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_release'] }}
+      ({{ ansible_facts['architecture'] }}), boot target "{{ hudiy_boot_target.stdout }}".
+      Raspberry Pi OS Lite will not work for Hudiy - flash the Desktop image instead.
+    success_msg: "OS check passed: Debian bookworm 64-bit with Desktop."
+
+- name: Check if Hudiy is already installed
+  ansible.builtin.stat:
+    path: "/home/{{ ansible_user }}/.hudiy/share/hudiy"
+  register: hudiy_install_check
+
+- name: Copy hudiy_installer.tar.gz to the Pi
+  ansible.builtin.copy:
+    src: "{{ hudiy_installer_local_path }}"
+    dest: "/home/{{ ansible_user }}/hudiy_installer.tar.gz"
+    mode: "0644"
+  when: not hudiy_install_check.stat.exists
+
+- name: Unpack hudiy_installer.tar.gz
+  ansible.builtin.unarchive:
+    src: "/home/{{ ansible_user }}/hudiy_installer.tar.gz"
+    dest: "/home/{{ ansible_user }}"
+    remote_src: true
+    creates: "/home/{{ ansible_user }}/hudiy_installer/run.sh"
+  when: not hudiy_install_check.stat.exists
+
+- name: Make run.sh executable
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/hudiy_installer/run.sh"
+    mode: "0755"
+  when: not hudiy_install_check.stat.exists
+
+- name: Install pexpect (required by the expect module on the target)
+  ansible.builtin.apt:
+    name: python3-pexpect
+    state: present
+  become: true
+  when: not hudiy_install_check.stat.exists
+
+- name: Run the Hudiy installer and answer the order number prompt
+  ansible.builtin.expect:
+    command: ./run.sh
+    chdir: "/home/{{ ansible_user }}/hudiy_installer"
+    responses:
+      "(?i)order number": "{{ hudiy_order_number }}"
+      "(?i)A system reboot is required to apply all changes\\. Do you want to reboot now\\? \\[y/n\\]:": "n" # we will reboot after making the cursor visible
+    timeout: 900 # due to default timeout being 30s clearly which isn't enough
+  # no_log: true
+  when: not hudiy_install_check.stat.exists
+
+- name: Ensure the Hudiy config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.hudiy/share/config"
+    state: directory
+    mode: "0755"
+
+- name: Check for an existing Hudiy main_configuration.json
+  ansible.builtin.stat:
+    path: "/home/{{ ansible_user }}/.hudiy/share/config/main_configuration.json"
+  register: hudiy_main_config_stat
+
+- name: Read the existing Hudiy main_configuration.json
+  ansible.builtin.slurp:
+    src: "/home/{{ ansible_user }}/.hudiy/share/config/main_configuration.json"
+  register: hudiy_main_config_raw
+  when: hudiy_main_config_stat.stat.exists
+
+- name: Enable the mouse cursor in the Hudiy UI (application.showCursor)
+  ansible.builtin.copy:
+    dest: "/home/{{ ansible_user }}/.hudiy/share/config/main_configuration.json"
+    content: >-
+      {{
+        (hudiy_main_config_raw.content | b64decode | from_json if hudiy_main_config_stat.stat.exists else {})
+        | combine({'application': {'showCursor': true}}, recursive=True)
+        | to_nice_json
+      }}
+    mode: "0644"

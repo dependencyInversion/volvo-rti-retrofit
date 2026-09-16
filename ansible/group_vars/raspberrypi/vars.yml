@@ -1,0 +1,21 @@
+---
+# Which app to install: "livi" or "hudiy"
+target_app: hudiy
+
+# Reboot the Pi after installation completes, regardless of target_app
+reboot_after_install: true
+
+# --- LIVI headless install config ---
+# See https://github.com/f-io/LIVI/blob/main/scripts/install/common.sh
+livi_channel: release        # release | nightly
+livi_hdmi_pr: "no"           # yes | no - RGB/VGA panel below HDMI's 25MHz clock floor
+livi_hdmi_pr_edid: ""        # display profile choice, only used if livi_hdmi_pr is "yes"
+livi_mfi: "no"                # yes | no - Apple MFi coprocessor wired via I2C
+livi_splash: "yes"             # yes | no - install LIVI boot splash
+
+# --- Hudiy install config ---Backlog	To Do	In Progress	Blocked	Validation	
+          
+# Path to hudiy_installer.tar.gz on the CONTROL machine (never stored in this repo).
+hudiy_installer_local_path: "{{ lookup('env', 'HOME') }}/Hudiy/hudiy_installer.tar.gz"
+
+# hudiy_order_number lives in vault.yml (ansible-vault encrypted), not here.

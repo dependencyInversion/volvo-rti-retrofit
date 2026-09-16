@@ -1,0 +1,8 @@
+---
+# Copy this file to vault.yml and then encrypt it in place:
+#   cp vault.yml.example vault.yml
+#   ansible-vault encrypt vault.yml
+#
+# Edit the encrypted value later with:
+#   ansible-vault edit vault.yml
+hudiy_order_number: "REPLACE-WITH-YOUR-ORDER-NUMBER"

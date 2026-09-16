@@ -1,0 +1,32 @@
+---
+- name: Create working directory for LIVI installer
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/livi-install"
+    state: directory
+    mode: "0755"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Download LIVI install script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/install.sh
+    dest: "/home/{{ ansible_user }}/livi-install/install.sh"
+    mode: "0755"
+    force: true
+
+- name: Run LIVI headless installer
+  ansible.builtin.command:
+    cmd: ./install.sh --headless
+    chdir: "/home/{{ ansible_user }}/livi-install"
+  environment:
+    LIVI_CHANNEL: "{{ livi_channel }}"
+    LIVI_HDMI_PR: "{{ livi_hdmi_pr }}"
+    LIVI_HDMI_PR_EDID: "{{ livi_hdmi_pr_edid }}"
+    LIVI_MFI: "{{ livi_mfi }}"
+    LIVI_SPLASH: "{{ livi_splash }}"
+  register: livi_install_result
+  changed_when: true
+
+- name: Show LIVI installer output
+  ansible.builtin.debug:
+    var: livi_install_result.stdout_lines
