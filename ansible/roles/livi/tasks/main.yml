@@ -1,4 +1,22 @@
 ---
+- name: Get default systemd boot target
+  ansible.builtin.command: systemctl get-default
+  register: livi_boot_target
+  changed_when: false
+
+- name: Verify OS is Raspberry Pi OS Lite (required by LIVI)
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == "Debian"
+      - ansible_facts['architecture'] == "aarch64"
+      - livi_boot_target.stdout == "multi-user.target"
+    fail_msg: >-
+      LIVI requires Raspberry Pi OS Lite (64-bit).
+      Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_release'] }}
+      ({{ ansible_facts['architecture'] }}), boot target "{{ livi_boot_target.stdout }}".
+      Flash the Lite image instead - LIVI will not work on the Desktop variant.
+    success_msg: "OS check passed: Raspberry Pi OS Lite (64-bit)."
+
 - name: Create working directory for LIVI installer
   ansible.builtin.file:
     path: "/home/{{ ansible_user }}/livi-install"
