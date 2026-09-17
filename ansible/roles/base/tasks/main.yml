@@ -5,11 +5,12 @@
     upgrade: dist
   become: true
 
-- name: Install fish shell and bpytop
+- name: Install fish shell, bpytop and vim
   ansible.builtin.apt:
     name:
       - fish
       - bpytop
+      - vim
     state: present
   become: true
 
