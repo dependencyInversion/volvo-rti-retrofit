@@ -32,10 +32,24 @@
     mode: "0755"
     force: true
 
-- name: Run LIVI headless installer
-  ansible.builtin.command:
-    cmd: ./install.sh --headless
+- name: Install pexpect (required by the expect module on the target)
+  ansible.builtin.apt:
+    name: python3-pexpect
+    state: present
+  become: true
+
+- name: Run the LIVI headless installer and answer the build-channel prompt
+  ansible.builtin.expect:
+    command: ./install.sh --headless
     chdir: "/home/{{ ansible_user }}/livi-install"
+    responses:
+      ? |-
+        Which build should be installed\?
+        1\) release   the latest tagged release
+        2\) nightly   the latest build of main
+        Choice \[1\]:
+      : "{{ '1' if livi_channel == 'release' else '2' }}"
+    timeout: 900
   environment:
     LIVI_CHANNEL: "{{ livi_channel }}"
     LIVI_HDMI_PR: "{{ livi_hdmi_pr }}"
