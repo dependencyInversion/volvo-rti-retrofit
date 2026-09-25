@@ -1,0 +1,32 @@
+---
+# Lets uxplay's window show up over Hudiy without quitting it: Hudiy's window
+# is pinned to labwc's always-on-bottom layer, so any other window - uxplay's
+# fullscreen video - is stacked above it, and Hudiy is visible again as soon as
+# uxplay closes its window when mirroring stops.
+# "*hudiy*" matches Hudiy's Wayland app_id whether Qt reports it plain or
+# reverse-domain prefixed.
+
+- name: Seed the user's labwc rc.xml from the system default if missing
+  ansible.builtin.copy:
+    src: /etc/xdg/labwc/rc.xml
+    dest: "{{ labwc_rc_xml }}"
+    remote_src: true
+    force: false
+    mode: "0644"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Keep Hudiy's window below uxplay (labwc window rule)
+  ansible.builtin.blockinfile:
+    path: "{{ labwc_rc_xml }}"
+    marker: "<!-- {mark} ANSIBLE MANAGED: uxplay over Hudiy -->"
+    insertbefore: "</openbox_config>"
+    block: |
+      <windowRules>
+        <windowRule identifier="*hudiy*">
+          <action name="ToggleAlwaysOnBottom"/>
+        </windowRule>
+      </windowRules>
+  become: true
+  become_user: "{{ ansible_user }}"
+  notify: Reconfigure labwc

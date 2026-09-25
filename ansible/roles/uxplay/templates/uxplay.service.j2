@@ -1,0 +1,16 @@
+[Unit]
+Description=UxPlay AirPlay mirroring receiver
+
+[Service]
+# stdbuf forces line-buffered stdout/stderr - without it, uxplay's own log
+# output sits in a full buffer and never reaches the journal until the
+# process exits, since Restart=always means it (almost) never does.
+ExecStart=/usr/bin/stdbuf -oL -eL /usr/bin/uxplay {{ uxplay_extra_args | default('') }}
+Restart=always
+RestartSec=2
+{% for key, value in (uxplay_environment | default({})).items() %}
+Environment={{ key }}={{ value }}
+{% endfor %}
+
+[Install]
+WantedBy=default.target

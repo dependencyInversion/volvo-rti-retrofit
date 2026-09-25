@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically refresh the uxplay desktop icon state
+
+[Timer]
+OnActiveSec=0s
+OnUnitActiveSec=5s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,49 @@
+---
+# Binds airplay-bridge's action to a Hudiy bottom-bar shortcut and a menu item.
+# Entries are only appended when missing, so user edits to these files survive.
+
+- name: Read Hudiy's shortcuts.json
+  ansible.builtin.slurp:
+    src: "{{ hudiy_config_dir }}/shortcuts.json"
+  register: hudiy_shortcuts_raw
+
+- name: Add the AirPlay shortcut to Hudiy's bottom bar
+  vars:
+    hudiy_shortcuts: "{{ hudiy_shortcuts_raw.content | b64decode | from_json }}"
+  ansible.builtin.copy:
+    dest: "{{ hudiy_config_dir }}/shortcuts.json"
+    content: >-
+      {{
+        hudiy_shortcuts
+        | combine({'shortcuts': hudiy_shortcuts.shortcuts + [{
+            'iconFontFamily': 'Material Symbols Rounded',
+            'iconName': 'airplay',
+            'action': airplay_action}]})
+        | to_nice_json(indent=4)
+      }}
+    mode: "0644"
+  when: airplay_action not in (hudiy_shortcuts.shortcuts | map(attribute='action'))
+
+- name: Read Hudiy's applications_menu.json
+  ansible.builtin.slurp:
+    src: "{{ hudiy_config_dir }}/applications_menu.json"
+  register: hudiy_menu_raw
+
+- name: Add the AirPlay item to Hudiy's applications menu
+  vars:
+    hudiy_menu: "{{ hudiy_menu_raw.content | b64decode | from_json }}"
+  ansible.builtin.copy:
+    dest: "{{ hudiy_config_dir }}/applications_menu.json"
+    content: >-
+      {{
+        hudiy_menu
+        | combine({'items': hudiy_menu['items'] + [{
+            'categories': [airplay_menu_category],
+            'iconFontFamily': 'Material Symbols Rounded',
+            'iconName': 'airplay',
+            'action': airplay_action,
+            'label': 'AirPlay'}]})
+        | to_nice_json(indent=4)
+      }}
+    mode: "0644"
+  when: airplay_action not in (hudiy_menu['items'] | map(attribute='action'))

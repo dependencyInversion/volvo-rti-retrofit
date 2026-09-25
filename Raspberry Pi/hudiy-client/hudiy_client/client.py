@@ -85,6 +85,8 @@ class Client:
 
         self._connected = True
         self._closing = False
+        # Drop any partial frame left over from a previous, broken connection.
+        self._receive_buffer = b""
         logger.info("connection established, sending HelloRequest")
         self._send_hello()
 
@@ -163,6 +165,58 @@ class Client:
         message = hudiy_api.SetStatusSubscriptions()
         message.subscriptions.extend(subscriptions)
         self.send(hudiy_api.MESSAGE_SET_STATUS_SUBSCRIPTIONS, 0, message.SerializeToString())
+
+    def register_action(self, action):
+        """Register a custom action. Hudiy answers with RegisterActionResponse and
+        later sends DispatchAction whenever it's triggered (shortcut, menu item...)."""
+        message = hudiy_api.RegisterActionRequest()
+        message.action = action
+        self.send(hudiy_api.MESSAGE_REGISTER_ACTION_REQUEST, 0, message.SerializeToString())
+
+    def register_toast_channel(self, name, description):
+        """Answered with RegisterToastChannelResponse carrying the channel id."""
+        message = hudiy_api.RegisterToastChannelRequest()
+        message.name = name
+        message.description = description
+        self.send(hudiy_api.MESSAGE_REGISTER_TOAST_CHANNEL_REQUEST, 0, message.SerializeToString())
+
+    def show_toast(self, channel_id, text, icon_font_family, icon_name):
+        message = hudiy_api.ShowToast()
+        message.channel_id = channel_id
+        message.message = text
+        message.icon_font_family = icon_font_family
+        message.icon_name = icon_name
+        self.send(hudiy_api.MESSAGE_SHOW_TOAST, 0, message.SerializeToString())
+
+    def register_status_icon(self, description, icon_font_family, icon_name):
+        """Answered with RegisterStatusIconResponse carrying the icon id."""
+        message = hudiy_api.RegisterStatusIconRequest()
+        message.description = description
+        message.icon_font_family = icon_font_family
+        message.icon_name = icon_name
+        self.send(hudiy_api.MESSAGE_REGISTER_STATUS_ICON_REQUEST, 0, message.SerializeToString())
+
+    def set_status_icon_visible(self, icon_id, visible):
+        message = hudiy_api.ChangeStatusIconState()
+        message.id = icon_id
+        message.visible = visible
+        self.send(hudiy_api.MESSAGE_CHANGE_STATUS_ICON_STATE, 0, message.SerializeToString())
+
+    def register_audio_focus_receiver(self, name, category, duck_priority):
+        """Answered with RegisterAudioFocusReceiverResponse carrying the receiver id."""
+        message = hudiy_api.RegisterAudioFocusReceiverRequest()
+        message.name = name
+        message.category = category
+        message.duck_priority = duck_priority
+        self.send(hudiy_api.MESSAGE_REGISTER_AUDIO_FOCUS_RECEIVER_REQUEST, 0, message.SerializeToString())
+
+    def request_audio_focus(self, receiver_id, focus_type):
+        """focus_type is an AudioFocusChangeRequest.AUDIO_FOCUS_TYPE_* value --
+        AUDIO_FOCUS_TYPE_RELEASE gives the focus back."""
+        message = hudiy_api.AudioFocusChangeRequest()
+        message.id = receiver_id
+        message.type = focus_type
+        self.send(hudiy_api.MESSAGE_AUDIO_FOCUS_CHANGE_REQUEST, 0, message.SerializeToString())
 
     def _send_hello(self):
         hello_request = hudiy_api.HelloRequest()

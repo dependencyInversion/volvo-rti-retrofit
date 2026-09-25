@@ -1,0 +1,51 @@
+---
+# airplay-bridge: the hudiy-client based daemon that adds the AirPlay button to
+# Hudiy and pauses Hudiy's media while the phone is mirroring.
+
+- name: Copy the hudiy-client package (contains airplay-bridge) to the Pi
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../Raspberry Pi/hudiy-client/"
+    dest: "{{ airplay_bridge_src }}/"
+    mode: preserve
+  become: true
+  become_user: "{{ ansible_user }}"
+  register: airplay_bridge_src_copy
+
+- name: Check for an existing airplay-bridge virtualenv
+  ansible.builtin.stat:
+    path: "{{ airplay_bridge_venv }}/bin/airplay-bridge"
+  register: airplay_bridge_bin
+
+# pip can't tell whether a local source tree changed, so only (re)install when
+# the copy above changed or the venv is missing - keeps re-runs idempotent.
+- name: Install airplay-bridge into its virtualenv
+  ansible.builtin.pip:
+    name: "{{ airplay_bridge_src }}"
+    virtualenv: "{{ airplay_bridge_venv }}"
+    virtualenv_command: python3 -m venv
+    state: forcereinstall
+  become: true
+  become_user: "{{ ansible_user }}"
+  when: airplay_bridge_src_copy.changed or not airplay_bridge_bin.stat.exists
+  notify: Restart airplay-bridge
+
+- name: Deploy the airplay-bridge systemd user service
+  ansible.builtin.template:
+    src: airplay-bridge.service.j2
+    dest: "{{ uxplay_systemd_user_dir }}/airplay-bridge.service"
+    mode: "0644"
+  become: true
+  become_user: "{{ ansible_user }}"
+  notify: Restart airplay-bridge
+
+- name: Enable and start the airplay-bridge systemd user service
+  ansible.builtin.systemd:
+    name: airplay-bridge
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ ansible_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"

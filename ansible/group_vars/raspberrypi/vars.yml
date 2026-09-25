@@ -19,3 +19,29 @@ livi_splash: "yes"             # yes | no - install LIVI boot splash
 hudiy_installer_local_path: "{{ lookup('env', 'HOME') }}/Hudiy/hudiy_installer.tar.gz"
 
 # hudiy_order_number lives in vault.yml (ansible-vault encrypted), not here.
+
+# --- uxplay (AirPlay mirroring receiver) — hudiy build only ---
+install_uxplay: true   # install uxplay and enable its desktop toggle by default
+# -p pins uxplay's ports (TCP 7000/7001/7100) - airplay-bridge detects an active
+# mirroring session by the connection on 7100. -nohold lets a reconnecting phone
+# take over a stale session instead of being refused.
+uxplay_extra_args: "-n \"Volvo RTI\" -nh -avdec -fs -vs waylandsink -p -nohold"  # extra CLI flags for uxplay
+# GST_DEBUG=2 logs GStreamer errors/warnings (e.g. video sink problems) to
+# `journalctl --user -u uxplay` without the per-frame noise of higher levels.
+# Add "-d" (or "-d 1" to drop packet dumps) to uxplay_extra_args above for
+# uxplay's own RTSP/RAOP connection-negotiation debug output.
+uxplay_environment:
+  GST_DEBUG: "2"
+
+# --- AirPlay inside Hudiy (airplay-bridge) — hudiy build only ---
+# Hudiy action bound to the AirPlay shortcut/menu item (also usable from a
+# steering-wheel button later via DispatchAction).
+airplay_action: airplay_toggle
+airplay_menu_category: Autobox   # applications_menu.json category the AirPlay item goes in
+
+# --- Wi-Fi while Hudiy is NOT running ---
+# Known networks (home Wi-Fi) as usual; if none connects within the timeout, an
+# access point with Hudiy's hotspot settings is started instead.
+hudiy_wifi_interface: wlan0
+hudiy_wifi_fallback_timeout: 20      # s without Wi-Fi before starting the access point
+hudiy_wifi_fallback_boot_grace: 60   # s at boot before Hudiy counts as "not running"

@@ -22,6 +22,17 @@ apt update+upgrade, `fish` as the default shell, and either **LIVI** or
    - Hudiy users: set `hudiy_installer_local_path` if your
      `hudiy_installer.tar.gz` isn't at `~/Hudiy/hudiy_installer.tar.gz` on this
      machine.
+     The hudiy role also puts a "Hudiy" shortcut on the desktop to start it
+     again after quitting it (no-op while it's already running).
+   - `install_uxplay` (hudiy builds only): installs
+     [uxplay](https://github.com/antimof/UxPlay) (AirPlay mirroring) and
+     enables it by default. Defaults to `true`; set `false` to skip it. Since
+     livi is fully headless, uxplay is never installed there regardless of
+     this setting. Adds a desktop shortcut on the hudiy desktop to start/stop
+     the service - the icon is colored while uxplay is running and grey while
+     stopped. Also integrates it into Hudiy - see
+     [AirPlay in the car](#airplay-in-the-car) (`airplay_*` and
+     `hudiy_wifi_*` vars).
 3. Hudiy only - set up the secret order number via Ansible Vault:
    ```
    cp group_vars/raspberrypi/vault.yml.example group_vars/raspberrypi/vault.yml
@@ -64,3 +75,38 @@ If you're not running Hudiy right now, drop the flag and rename `vault.yml`
 out of the way instead (see the warning above).
 
 Dry run first with `--check --diff`.
+
+## AirPlay in the car
+
+With `install_uxplay` on (hudiy builds only), AirPlay mirroring runs on top of
+Hudiy:
+
+1. Connect the iPhone to Hudiy's Wi-Fi hotspot (`hotspot.ssid` in Hudiy's
+   `main_configuration.json`). CarPlay isn't handed over automatically yet, so
+   you have to join the hotspot on the phone yourself.
+2. Tap **AirPlay** in Hudiy's bottom bar, or find it in the menu under the
+   `airplay_menu_category` category. It starts uxplay if it isn't running and
+   shows a toast with instructions.
+3. On the phone, open Control Center > Screen Mirroring > **Volvo RTI**. The
+   mirrored screen appears over Hudiy, a status icon shows up, and Hudiy's own
+   media pauses.
+4. To stop, end mirroring on the phone or tap **AirPlay** again. Hudiy's media
+   is released again.
+
+For a full-width picture on the wide RTI screen, mirror in landscape: turn the
+iPhone's rotation lock off and use a landscape mount.
+
+How it fits together:
+- `airplay-bridge` (from `Raspberry Pi/hudiy-client`, systemd user unit)
+  registers the `airplay_toggle` Hudiy action and watches uxplay's mirroring
+  port to show the status icon and take Hudiy's audio focus.
+- A labwc window rule in `~/.config/labwc/rc.xml` keeps Hudiy's window on
+  labwc's always-on-bottom layer, so uxplay's fullscreen window stacks above it.
+- **Wi-Fi when Hudiy isn't running** (`hudiy-wifi-fallback`, systemd user
+  unit): Hudiy's own Wi-Fi settings stay untouched. Once Hudiy has been quit,
+  the Pi joins known networks (e.g. home Wi-Fi) as usual. If none connects
+  within `hudiy_wifi_fallback_timeout` seconds, it starts an access point with
+  exactly Hudiy's hotspot settings, so the phone sees the same network either
+  way. It is taken down again as soon as Hudiy starts.
+
+Logs: `journalctl --user -u airplay-bridge -u hudiy-wifi-fallback -u uxplay`.

@@ -12,6 +12,9 @@
     - role: hudiy
       when: target_app == "hudiy"
 
+    - role: uxplay
+      when: target_app == "hudiy" and (install_uxplay | default(true) | bool)
+
   post_tasks:
     - name: Reboot after install
       ansible.builtin.reboot:

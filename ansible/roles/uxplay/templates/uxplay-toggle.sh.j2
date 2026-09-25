@@ -1,0 +1,9 @@
+#!/bin/bash
+# Toggle the uxplay AirPlay mirroring service on/off.
+if systemctl --user is-active --quiet uxplay; then
+  systemctl --user stop uxplay
+else
+  systemctl --user start uxplay
+fi
+# Update the desktop icon right away instead of waiting for the next timer tick.
+"{{ uxplay_bin_dir }}/uxplay-status-watch.sh" || true

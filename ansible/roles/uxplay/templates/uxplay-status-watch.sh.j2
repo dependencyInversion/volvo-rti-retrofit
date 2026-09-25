@@ -1,0 +1,23 @@
+#!/bin/bash
+# Points the desktop shortcut's Icon= at the on/off icon to reflect whether
+# the uxplay service is currently running. The icon path itself has to
+# change - pcmanfm caches icons by path, so overwriting the same file with a
+# different image never shows up on the desktop.
+set -euo pipefail
+
+ICON_DIR="{{ uxplay_icon_dir }}"
+DESKTOP_FILE="{{ uxplay_desktop_dir }}/uxplay-toggle.desktop"
+
+if systemctl --user is-active --quiet uxplay; then
+  ICON="$ICON_DIR/uxplay-on.svg"
+else
+  ICON="$ICON_DIR/uxplay-off.svg"
+fi
+
+[ -f "$DESKTOP_FILE" ] || exit 0
+grep -qxF "Icon=$ICON" "$DESKTOP_FILE" && exit 0
+
+# Rewrite in place (same inode) rather than sed -i, which replaces the file
+# and can drop its gio metadata::trusted flag.
+CONTENT=$(sed "s|^Icon=.*|Icon=$ICON|" "$DESKTOP_FILE")
+printf '%s\n' "$CONTENT" > "$DESKTOP_FILE"

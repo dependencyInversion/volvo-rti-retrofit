@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Hudiy
+Comment=Start Hudiy (does nothing if it is already running)
+Exec=/bin/sh -c "pgrep -x hudiy >/dev/null || exec /home/{{ ansible_user }}/.hudiy/share/hudiy_run.sh"
+Icon=video-display
+Terminal=false
+Categories=AudioVideo;

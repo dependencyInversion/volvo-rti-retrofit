@@ -1,0 +1,10 @@
+[Unit]
+Description=Wi-Fi while Hudiy is not running - known network, else a clone of Hudiy's hotspot
+
+[Service]
+ExecStart={{ uxplay_bin_dir }}/hudiy-wifi-fallback.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

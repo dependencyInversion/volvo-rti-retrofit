@@ -1,0 +1,84 @@
+#!/bin/bash
+# Wi-Fi while Hudiy is NOT running (e.g. after quitting it for maintenance).
+# While Hudiy runs, its own hotspot owns {{ hudiy_wifi_interface }} and this script stays out of the way.
+#
+# With Hudiy gone, NetworkManager autoconnects known networks (e.g. home Wi-Fi) as
+# usual. If {{ hudiy_wifi_interface }} is still unconnected after {{ hudiy_wifi_fallback_timeout }}s, this brings up an access
+# point cloned from Hudiy's hotspot settings (read fresh from main_configuration.json
+# each time, so changes made in Hudiy's settings carry over) - the iPhone sees the
+# same network in both modes. When Hudiy starts again, the clone is taken down so
+# Hudiy can set up its own hotspot.
+set -uo pipefail
+
+CONFIG="/home/{{ ansible_user }}/.hudiy/share/config/main_configuration.json"
+CLONE="hudiy-hotspot-clone"
+IFACE="{{ hudiy_wifi_interface }}"
+TIMEOUT={{ hudiy_wifi_fallback_timeout }}
+BOOT_GRACE={{ hudiy_wifi_fallback_boot_grace }}
+POLL=5
+
+log() { echo "$*"; }
+
+hudiy_running() { pgrep -x hudiy >/dev/null; }
+
+wifi_connected() {
+  [[ $(nmcli -g GENERAL.STATE device show "$IFACE" 2>/dev/null) == 100* ]]
+}
+
+clone_active() {
+  nmcli -t -f NAME connection show --active | grep -Fxq "$CLONE"
+}
+
+start_clone() {
+  local settings
+  if ! settings=$(python3 - "$CONFIG" <<'PY'
+import json, sys
+hotspot = json.load(open(sys.argv[1])).get("hotspot", {})
+if not hotspot.get("enabled") or not hotspot.get("ssid"):
+    sys.exit(1)
+print(hotspot["ssid"])
+print(hotspot.get("passphrase", ""))
+print("a" if hotspot.get("bandwidth") == "A" else "bg")
+print(hotspot.get("ipAddress") or "192.168.12.1")
+PY
+  ); then
+    log "Hudiy's hotspot is disabled (or $CONFIG unreadable) - not starting an access point"
+    return 1
+  fi
+
+  local ssid passphrase band ip
+  { read -r ssid; read -r passphrase; read -r band; read -r ip; } <<< "$settings"
+
+  log "no Wi-Fi after ${TIMEOUT}s - starting access point '$ssid' (band $band, $ip) like Hudiy's hotspot"
+  nmcli connection delete "$CLONE" >/dev/null 2>&1
+  nmcli connection add type wifi ifname "$IFACE" con-name "$CLONE" autoconnect no ssid "$ssid" \
+    802-11-wireless.mode ap 802-11-wireless.band "$band" \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$passphrase" \
+    ipv4.method shared ipv4.addresses "$ip/24" ipv6.method disabled >/dev/null &&
+    nmcli connection up "$CLONE" >/dev/null
+}
+
+# At boot Hudiy isn't up yet either - give labwc's autostart time to launch it
+# before deciding it's "not running".
+sleep "$BOOT_GRACE"
+
+offline_since=""
+while true; do
+  if hudiy_running; then
+    offline_since=""
+    if clone_active; then
+      log "Hudiy is running - taking down '$CLONE' so Hudiy can start its own hotspot"
+      nmcli connection down "$CLONE" >/dev/null
+    fi
+  elif wifi_connected; then
+    offline_since=""
+  else
+    now=$(date +%s)
+    offline_since=${offline_since:-$now}
+    if (( now - offline_since >= TIMEOUT )); then
+      start_clone || true
+      offline_since=""
+    fi
+  fi
+  sleep "$POLL"
+done

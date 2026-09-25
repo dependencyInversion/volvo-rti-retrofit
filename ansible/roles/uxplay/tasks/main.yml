@@ -1,0 +1,135 @@
+---
+- name: Install uxplay (and python3-venv for airplay-bridge)
+  ansible.builtin.apt:
+    name:
+      - uxplay
+      - python3-venv
+    state: present
+  become: true
+
+- name: Set uxplay path facts
+  ansible.builtin.set_fact:
+    uxplay_bin_dir: "/home/{{ ansible_user }}/.local/bin"
+    uxplay_icon_dir: "/home/{{ ansible_user }}/.local/share/icons/uxplay"
+    uxplay_desktop_dir: "/home/{{ ansible_user }}/Desktop"
+    uxplay_systemd_user_dir: "/home/{{ ansible_user }}/.config/systemd/user"
+    hudiy_config_dir: "/home/{{ ansible_user }}/.hudiy/share/config"
+    labwc_rc_xml: "/home/{{ ansible_user }}/.config/labwc/rc.xml"
+    airplay_bridge_src: "/home/{{ ansible_user }}/.local/share/airplay-bridge/src"
+    airplay_bridge_venv: "/home/{{ ansible_user }}/.local/share/airplay-bridge/venv"
+
+- name: Enable linger for the connecting user (starts their systemd --user instance at boot)
+  ansible.builtin.command: "loginctl enable-linger {{ ansible_user }}"
+  become: true
+  args:
+    creates: "/var/lib/systemd/linger/{{ ansible_user }}"
+
+- name: Create required directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ uxplay_bin_dir }}"
+    - "{{ uxplay_icon_dir }}"
+    - "{{ uxplay_desktop_dir }}"
+    - "{{ uxplay_systemd_user_dir }}"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Deploy uxplay status icons (colored/grey)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ uxplay_icon_dir }}/{{ item }}"
+    mode: "0644"
+  loop:
+    - uxplay-on.svg
+    - uxplay-off.svg
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Deploy the uxplay systemd user service
+  ansible.builtin.template:
+    src: uxplay.service.j2
+    dest: "{{ uxplay_systemd_user_dir }}/uxplay.service"
+    mode: "0644"
+  become: true
+  become_user: "{{ ansible_user }}"
+  notify: Restart uxplay
+
+- name: Deploy the uxplay status-icon watcher service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ uxplay_systemd_user_dir }}/{{ item }}"
+    mode: "0644"
+  loop:
+    - uxplay-status-watch.service
+    - uxplay-status-watch.timer
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Deploy the uxplay toggle script
+  ansible.builtin.template:
+    src: uxplay-toggle.sh.j2
+    dest: "{{ uxplay_bin_dir }}/uxplay-toggle.sh"
+    mode: "0755"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Deploy the uxplay status-icon watcher script
+  ansible.builtin.template:
+    src: uxplay-status-watch.sh.j2
+    dest: "{{ uxplay_bin_dir }}/uxplay-status-watch.sh"
+    mode: "0755"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Deploy the uxplay desktop shortcut
+  ansible.builtin.template:
+    src: uxplay-toggle.desktop.j2
+    dest: "{{ uxplay_desktop_dir }}/uxplay-toggle.desktop"
+    mode: "0755"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Mark the desktop shortcut as trusted (avoids pcmanfm's "untrusted launcher" prompt)
+  ansible.builtin.command: "gio set {{ uxplay_desktop_dir }}/uxplay-toggle.desktop metadata::trusted true"
+  become: true
+  become_user: "{{ ansible_user }}"
+  changed_when: false
+  failed_when: false
+
+- name: Enable and start the uxplay systemd user service
+  ansible.builtin.systemd:
+    name: uxplay
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ ansible_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+
+- name: Enable and start the uxplay status-icon watcher timer
+  ansible.builtin.systemd:
+    name: uxplay-status-watch.timer
+    scope: user
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ ansible_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+
+- name: Integrate uxplay into Hudiy (AirPlay button, media pause)
+  ansible.builtin.import_tasks: bridge.yml
+
+- name: Add the AirPlay button to Hudiy's bottom bar and menu
+  ansible.builtin.import_tasks: hudiy_integration.yml
+
+- name: Stack uxplay's window above Hudiy
+  ansible.builtin.import_tasks: labwc.yml
+
+- name: Set up Wi-Fi for when Hudiy isn't running
+  ansible.builtin.import_tasks: network.yml

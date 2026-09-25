@@ -1,0 +1,12 @@
+[Unit]
+Description=AirPlay bridge - integrates uxplay into Hudiy (button, media pause)
+After=uxplay.service
+
+[Service]
+ExecStart={{ airplay_bridge_venv }}/bin/airplay-bridge --action {{ airplay_action }}
+Restart=always
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

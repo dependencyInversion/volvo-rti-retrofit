@@ -89,3 +89,22 @@
         | to_nice_json
       }}
     mode: "0644"
+
+# Same launcher labwc's autostart uses, so Hudiy can be restarted after
+# quitting it without a reboot.
+- name: Ensure the Desktop directory exists
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/Desktop"
+    state: directory
+    mode: "0755"
+
+- name: Deploy the Hudiy desktop shortcut
+  ansible.builtin.template:
+    src: hudiy.desktop.j2
+    dest: "/home/{{ ansible_user }}/Desktop/hudiy.desktop"
+    mode: "0755"
+
+- name: Mark the Hudiy desktop shortcut as trusted (avoids pcmanfm's "untrusted launcher" prompt)
+  ansible.builtin.command: "gio set /home/{{ ansible_user }}/Desktop/hudiy.desktop metadata::trusted true"
+  changed_when: false
+  failed_when: false

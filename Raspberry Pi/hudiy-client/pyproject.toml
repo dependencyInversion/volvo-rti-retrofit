@@ -12,6 +12,9 @@ dependencies = [
     "websocket-client (>=1.8,<2.0)"
 ]
 
+[project.scripts]
+airplay-bridge = "hudiy_client.apps.airplay_bridge:main"
+
 [tool.poetry]
 packages = [{ include = "hudiy_client" }]
 

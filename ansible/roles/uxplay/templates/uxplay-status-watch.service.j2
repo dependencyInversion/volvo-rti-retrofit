@@ -1,0 +1,6 @@
+[Unit]
+Description=Update the uxplay desktop icon to reflect its running state
+
+[Service]
+Type=oneshot
+ExecStart={{ uxplay_bin_dir }}/uxplay-status-watch.sh
